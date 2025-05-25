@@ -14,7 +14,7 @@ pipeline   {
     stages {
         stage('Git Checkout') {
             steps {
-                 Git URL
+                 git branch: 'main', credentialsId: 'Git-creds', url: 'https://github.com/sathish103/Multi-Tier-BankApp-CI.git'
                 }            
             }
         }
@@ -38,8 +38,8 @@ pipeline   {
         stage('SonarQube Analysis') {
             steps {               
                 withSonarQubeEnv('SonarQube') {
-                    sh ''' ${SCANNER_HOME}/bin/sonar-scanner -Dsonar.projectName=GCBank \
-                            -Dsonar.projectKey=GCBank \
+                    sh ''' ${SCANNER_HOME}/bin/sonar-scanner -Dsonar.projectName=Project-Bank \
+                            -Dsonar.projectKey=Project-Bank \
                             -Dsonar.java.binaries=target '''
                     }
                 }
@@ -70,8 +70,8 @@ pipeline   {
 // here we have to add the docker credentials in Jenkins credentials
         stage('Build & Tag Docker Image') {
             steps {
-                withDockerRegistry(credentialsId: 'dockerhub-credentials') {
-                    sh 'docker build -t devopsshack/gcbank:$IMAGE_TAG .'
+                withDockerRegistry(credentialsId: 'docker-creds') {
+                    sh 'docker build -t sathish103/project:$IMAGE_TAG .'
                 } 
 
             } 
@@ -79,32 +79,32 @@ pipeline   {
 
         stage('Trivy Image Scan') {
             steps {
-                sh 'trivy image --fromat table -o image-report.html devopsshack/gcbank:$IMAGE_TAG'
+                sh 'trivy image --fromat table -o image-report.html sathish103/project:$IMAGE_TAG'
             }
         }
 
         stage('Docker Push Image') {
             steps {
-                withDockerRegistry(credentialsId: 'dockerhub-credentials') {
-                    sh 'docker push devopsshack/gcbank:$IMAGE_TAG'
+                withDockerRegistry(credentialsId: 'docker-creds') {
+                    sh 'docker push sathish103/project:$IMAGE_TAG'
                 } 
 
             } 
         }
 
-        stage('Update Manifest file with image tag') {
+     /*   stage('Update Manifest file with image tag') {
             steps {
                 script  {
                     // clean workspace before updating the manifest file
                     cleanWs()
-                    withCredentials([usernamePassword(credentialsId: 'git', usernameVariable: 'git_username', passwordVariable: 'git_password')])                        
+                    withCredentials([usernamePassword(credentialsId: 'Git-creds', passwordVariable: '', usernameVariable: '')])                        
                     sh '''
                         # Clone the project repository
-                        git clone htttp://github.com/devopsshack/GCBank.git
+                        git clone https://github.com/sathish103/Multi-Tier-BankApp-CI.git
 
                         # Update the manifest.yaml with the new image tag
                         cd manifest-cd/
-                        sed -i 's|image: devopsshack/gcbank:.*|image: devopsshack/gcbank:$IMAGE_TAG|' k8s/deployment.yaml
+                        sed -i 's|image: devopsshack/gcbank:.*|image: sathish103/project:$IMAGE_TAG|' k8s/deployment.yaml
 
                         # Confirm the changes
                         echo "Updates manifest file content:"
@@ -152,7 +152,7 @@ pipeline   {
                 )
             }
         }
-    }
+    }/*
 }
 
 
