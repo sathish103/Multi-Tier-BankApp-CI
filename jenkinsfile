@@ -92,7 +92,7 @@ pipeline   {
             } 
         }
 
-     /*   stage('Update Manifest file with image tag') {
+        stage('Update Manifest file with image tag') {
             steps {
                 script  {
                     // clean workspace before updating the manifest file
@@ -152,11 +152,6 @@ pipeline   {
                 )
             }
         }
-    }/*
+    }
 }
-
-
-
-
-
 
