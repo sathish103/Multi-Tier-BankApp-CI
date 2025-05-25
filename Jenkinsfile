@@ -1,6 +1,6 @@
 // CI Jenkinsfile for GCBank Application
 
-pipeline   {
+pipeline {
     agent any
     tools {
         maven 'maven3'
@@ -20,27 +20,28 @@ pipeline   {
         
         stage('compile') {
             steps {               
-                    sh 'mvn compile'
+                sh 'mvn compile'
             }
         }
         stage('Test') {
             steps {                
-                    sh 'mvn test'
+                sh 'mvn test'
             }
         }
         
         stage('Trivy FS scan'){
             steps {                
-                    sh 'trivy fs --format table -o fs-report.html .'
+                sh 'trivy fs --format table -o fs-report.html .'
             }
         }
         
         stage('SonarQube Analysis') {
             steps {               
                 withSonarQubeEnv('SonarQube') {
-                    sh ''' ${SCANNER_HOME}/bin/sonar-scanner -Dsonar.projectName=Project-Bank \
-                            -Dsonar.projectKey=Project-Bank \
-                            -Dsonar.java.binaries=target '''
+                    sh '''${SCANNER_HOME}/bin/sonar-scanner \
+                        -Dsonar.projectKey=Project-Bank \
+                        -Dsonar.projectName=Project-Bank \
+                        -Dsonar.java.binaries=target'''
                 }
             }
         }
@@ -61,7 +62,7 @@ pipeline   {
 // update the nexus repo ID & creds in Jenkins "managed files" settings.xml
         stage('Publish Artifacts') {
             steps {
-                withMaven(globalMavenSettingsConfig: 'devopsshack', mavenName: 'maven3', mavenSettingConfig: '', trackerName: 'maven') {
+                withMaven(globalMavenSettingsConfig: 'devopsshack', jdk: '', maven: 'maven3', mavenSettingsConfig: '', traceability: true) {
                     sh 'mvn deploy'
                 }
                 
@@ -70,7 +71,7 @@ pipeline   {
 //here we have to add the docker credentials in Jenkins credentials
         stage('Build & Tag Docker Image') {
             steps {
-                withDockerRegistry(credentialsId: 'docker-creds') {
+                withDockerRegistry(credentialsId: 'docker-creds', url: 'https://index.docker.io/v1/') {
                     sh 'docker build -t sathish103/project:$IMAGE_TAG .'
                 } 
 
@@ -79,13 +80,13 @@ pipeline   {
 
         stage('Trivy Image Scan') {
             steps {
-                sh 'trivy image --fromat table -o image-report.html sathish103/project:$IMAGE_TAG'
+                sh 'trivy image --format table -o image-report.html sathish103/project:$IMAGE_TAG'
             }
         }
 
         stage('Docker Push Image') {
             steps {
-                withDockerRegistry(credentialsId: 'docker-creds') {
+                withDockerRegistry(credentialsId: 'docker-creds', url: 'https://index.docker.io/v1/') {
                     sh 'docker push sathish103/project:$IMAGE_TAG'
                 } 
 
@@ -94,36 +95,34 @@ pipeline   {
 
         stage('Update Manifest file with image tag') {
             steps {
-                script  {
-                    // clean workspace before updating the manifest file
+                script {
                     cleanWs()
 
-                    withCredentials([usernamePassword(credentialsId: 'Git-creds', passwordVariable: '', usernameVariable: '')]) {                       
-                    sh '''
-                        # Clone the project repository
-                        git clone https://github.com/sathish103/Multi-Tier-BankApp-CI.git
+                    withCredentials([usernamePassword(credentialsId: 'Git-creds', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
+                        sh '''
+                            # Clone the repo using HTTPS with credentials
+                            git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/sathish103/Multi-Tier-BankApp-CI.git
 
-                        # Update the manifest.yaml with the new image tag
-                        cd manifest-cd/
-                        sed -i 's|image: devopsshack/gcbank:.*|image: sathish103/project:$IMAGE_TAG|' k8s/deployment.yaml
+                            cd Multi-Tier-BankApp-CI
 
-                        # Confirm the changes
-                        echo "Updates manifest file content:"
-                        cat manifest-cd/deployment.yaml
+                            # Update the manifest file with the new image tag
+                            sed -i "s|image: sathish103/project:.*|image: sathish103/project:${IMAGE_TAG}|" manifest-cd/k8s/deployment.yaml
 
-                        # Commit and push the changes
+                            echo "Updated manifest file content:"
+                            cat manifest-cd/k8s/deployment.yaml
 
-                        git config user.name "Jenkins CI"
-                        git config user.email "jenkins@gmail.com"
-                        git add manifest-cd/deployment.yaml
-                        git commit -m "Updated deployment.yaml with image tag $IMAGE_TAG"
-                        git push origin main
-                    '''
+                            # Configure Git user
+                            git config --global user.name "sathish103" 
+                            git config --global user.email "sathishreddys786@gmail.com"
+                           
+                            # Commit and push the change
+                            git add manifest-cd/k8s/deployment.yaml
+                            git commit -m "Updated deployment.yaml with image tag ${IMAGE_TAG}"
+                            git push origin main
+                        '''
                     }
-                    
                 }
             }
-            
         }
     }
     post {
@@ -147,12 +146,12 @@ pipeline   {
                 </html>
                 """
                 emailext (
-                    subject: "${jobName} - Build ${buildNumber} - ${pipelineStatus.toUpperCase()}",
+                    subject: "${jobName} - Build #${buildNumber} - ${pipelineStatus.toUpperCase()}",
                     body: body,
-                    to: '567adddi.jais@gmail.com',
-                    from: 'jenkins@devopsshack.com',
-                    replyTo: 'jenkins@devopsshack.com',
-                    mimeType: 'text/html',
+                    to: 'sathiscool444@gmail.com',
+                    from: 'sathishreddys786@gmail.com',
+                    replyTo: 'sathishreddys786@gmail.com',
+                    mimeType: 'text/html'
                 )
             }
         }
