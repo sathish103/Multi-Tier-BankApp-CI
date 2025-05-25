@@ -4,35 +4,35 @@ pipeline   {
     agent any
     tools {
         maven 'maven3'
-        }
+    }
 
     environment {
         SCANNER_HOME = tool 'sonar-scanner'
         IMAGE_TAG = "v${BUILD_NUMBER}"
-        }
+    }
 // Add git creds to the jenkins credentials
     stages {
         stage('Git Checkout') {
             steps {
                  git branch: 'main', credentialsId: 'Git-creds', url: 'https://github.com/sathish103/Multi-Tier-BankApp-CI.git'
-                }            
-            }
+            }            
+        }
         
         stage('compile') {
             steps {               
                     sh 'mvn compile'
-                }
+            }
         }
         stage('Test') {
             steps {                
                     sh 'mvn test'
-                }
+            }
         }
         
         stage('Trivy FS scan'){
             steps {                
                     sh 'trivy fs --format table -o fs-report.html .'
-                }
+            }
         }
         
         stage('SonarQube Analysis') {
@@ -41,8 +41,8 @@ pipeline   {
                     sh ''' ${SCANNER_HOME}/bin/sonar-scanner -Dsonar.projectName=Project-Bank \
                             -Dsonar.projectKey=Project-Bank \
                             -Dsonar.java.binaries=target '''
-                    }
                 }
+            }
         }
 //setup sonarqube-webhook for jenkins
         stage('Quality Gate check') { 
@@ -67,7 +67,7 @@ pipeline   {
                 
             }
         }
-// here we have to add the docker credentials in Jenkins credentials
+//here we have to add the docker credentials in Jenkins credentials
         stage('Build & Tag Docker Image') {
             steps {
                 withDockerRegistry(credentialsId: 'docker-creds') {
@@ -97,7 +97,8 @@ pipeline   {
                 script  {
                     // clean workspace before updating the manifest file
                     cleanWs()
-                    withCredentials([usernamePassword(credentialsId: 'Git-creds', passwordVariable: '', usernameVariable: '')])                        
+
+                    withCredentials([usernamePassword(credentialsId: 'Git-creds', passwordVariable: '', usernameVariable: '')]) {                       
                     sh '''
                         # Clone the project repository
                         git clone https://github.com/sathish103/Multi-Tier-BankApp-CI.git
@@ -118,39 +119,41 @@ pipeline   {
                         git commit -m "Updated deployment.yaml with image tag $IMAGE_TAG"
                         git push origin main
                     '''
+                    }
+                    
                 }
             }
             
         }
-        post {
-            always {
-                script {
-                    def jobName = env.JOB_NAME
-                    def buildNumber = env.BUILD_NUMBER
-                    def pipelineStatus = currentBuild.result ?: 'UNKNOWN'
-                    def bannerColor = pipelineStatus.toUpperCase() == 'SUCCESS' ? 'green' : 'red'
+    }
+    post {
+        always {
+            script {
+                def jobName = env.JOB_NAME
+                def buildNumber = env.BUILD_NUMBER
+                def pipelineStatus = currentBuild.result ?: 'UNKNOWN'
+                def bannerColor = pipelineStatus.toUpperCase() == 'SUCCESS' ? 'green' : 'red'
 
-                    def body = """
-                    <html>
-                    <body>
-                    <div style="border: 4px solid ${bannerColor}; padding: 10px;">
-                    <h2>${jobName} - Build ${buildNumber}</h2>
-                    <div style="background-color: ${bannerColor}; padding: 10px;">
-                    <h3 style="color: white;">Pipeline Status: ${pipelineStatus.toUpperCase()}</h3>
-                    </div>
-                    <p>Check the <a href="${BUILD_URL}">console output</a>.</p>
-                    </body>
-                    </html>
-                    """
+                def body = """
+                <html>
+                <body>
+                <div style="border: 4px solid ${bannerColor}; padding: 10px;">
+                <h2>${jobName} - Build ${buildNumber}</h2>
+                <div style="background-color: ${bannerColor}; padding: 10px;">
+                <h3 style="color: white;">Pipeline Status: ${pipelineStatus.toUpperCase()}</h3>
+                </div>
+                <p>Check the <a href="${BUILD_URL}">console output</a>.</p>
+                </body>
+                </html>
+                """
                 emailext (
-                        subject: "${jobName} - Build ${buildNumber} - ${pipelineStatus.toUpperCase()}",
-                        body: body,
-                        to: '567adddi.jais@gmail.com',
-                        from: 'jenkins@devopsshack.com',
-                        replyTo: 'jenkins@devopsshack.com',
-                        mimeType: 'text/html',
-                    )
-                }
+                    subject: "${jobName} - Build ${buildNumber} - ${pipelineStatus.toUpperCase()}",
+                    body: body,
+                    to: '567adddi.jais@gmail.com',
+                    from: 'jenkins@devopsshack.com',
+                    replyTo: 'jenkins@devopsshack.com',
+                    mimeType: 'text/html',
+                )
             }
         }
     }
